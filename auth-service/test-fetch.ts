@@ -1,0 +1,1 @@
+import app from './src/app.ts'; const server = app.listen(3002, async () => { try { const res = await fetch('http://localhost:3002/signup', {method: 'POST'}); console.log('STATUS:', res.status); console.log('TEXT:', await res.text()); } finally { server.close(); } });

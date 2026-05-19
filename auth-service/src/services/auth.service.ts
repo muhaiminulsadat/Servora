@@ -64,6 +64,55 @@ export const signUpService = async (signUpData: ISignUpData) => {
 
     return {user: newUser.toObject(), token};
   } catch (error: any) {
+    if (error instanceof AppError) {
+      throw error;
+    }
+
     throw new AppError(error.message || "An unexpected error occurred", 500);
   }
 };
+
+export const loginService = async (email: string, password: string) => {
+  try {
+    const user = await User.findOne({email}).select("+password");
+
+    if (!user) {
+      throw new AppError("Invalid email or password", 401);
+    }
+
+    const isMatch = await bcrypt.compare(password, user.password);
+
+    if (!isMatch) {
+      throw new AppError("Invalid email or password", 401);
+    }
+
+    const payload = {
+      userId: user._id,
+      email: user.email,
+      fullName: user.fullName,
+      role: user.role,
+    };
+
+    const JWT_SECRET = process.env.JWT_SECRET;
+
+    if (!JWT_SECRET) {
+      throw new AppError(
+        "JWT secret is not defined in environment variables",
+        500,
+      );
+    }
+
+    const token = jwt.sign(payload, JWT_SECRET, {
+      expiresIn: "1y",
+    });
+
+    return {user: user.toObject(), token};
+  } catch (error: any) {
+    if (error instanceof AppError) {
+      throw error;
+    }
+
+    throw new AppError(error.message || "An unexpected error occurred", 500);
+  }
+};
+

@@ -2,7 +2,7 @@ import type {Request, Response} from "express";
 import {AppError} from "../utils/AppError.ts";
 import {registerUser} from "../services/otp.service.ts";
 import type {ApiResponse} from "../types/apiResponse.type.ts";
-import {signUpService} from "../services/auth.service.ts";
+import {loginService, signUpService} from "../services/auth.service.ts";
 
 export const sendEmailController = async (req: Request, res: Response) => {
   try {
@@ -93,4 +93,39 @@ export const signUpController = async (req: Request, res: Response) => {
   }
 };
 
+export const loginController = async (req: Request, res: Response) => {
+  try {
+    const {email, password} = req.body;
 
+    // ================ Validation =================
+    if (!email || !password) {
+      throw new AppError("Email and password are required", 400);
+    }
+
+    // ============== Service Call =================
+    const {user, token} = await loginService(email, password);
+
+    const {password: _password, ...safeUser} = user;
+
+    const options = {
+      expires: new Date(Date.now() + 1 * 365 * 24 * 60 * 60 * 1000), // 1 year
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict" as const,
+    };
+
+    res.cookie("token", token, options);
+
+    res.status(200).json({
+      success: true,
+      message: "User logged in successfully",
+      data: {user: safeUser, token},
+    } as ApiResponse<{user: typeof user; token: string}>);
+  } catch (error) {
+    // =============== Error Handling =================
+    res.status((error as any).statusCode || 500).json({
+      success: false,
+      message: (error as any).message || "An unexpected error occurred",
+    });
+  }
+};

@@ -1,7 +1,8 @@
 import type {Request, Response} from "express";
 import {AppError} from "../utils/AppError.ts";
-import {registerUser} from "../services/auth.service.ts";
+import {registerUser} from "../services/otp.service.ts";
 import type {ApiResponse} from "../types/apiResponse.type.ts";
+import {signUpService} from "../services/auth.service.ts";
 
 export const sendEmailController = async (req: Request, res: Response) => {
   try {
@@ -40,3 +41,56 @@ export const testController = async (req: Request, res: Response) => {
     message: "Test endpoint is working!",
   });
 };
+
+export const signUpController = async (req: Request, res: Response) => {
+  try {
+    const {fullName, email, password, role, otp} = req.body;
+
+    // ================ Validation =================
+    if (!fullName || !email || !password || !role) {
+      throw new AppError(
+        "Full name, email, password, and role are required",
+        400,
+      );
+    }
+
+    if (!otp || otp.length !== 4) {
+      throw new AppError("Please enter a valid 4-digit OTP", 400);
+    }
+
+    // ============== Service Call =================
+
+    const {user, token} = await signUpService({
+      fullName,
+      email,
+      password,
+      role,
+      otp,
+    });
+
+    const {password: _password, ...safeUser} = user;
+
+    const options = {
+      expires: new Date(Date.now() + 1 * 365 * 24 * 60 * 60 * 1000), // 1 year
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict" as const,
+    };
+
+    res.cookie("token", token, options);
+
+    res.status(201).json({
+      success: true,
+      message: "User registered successfully",
+      data: {user: safeUser, token},
+    } as ApiResponse<{user: typeof user; token: string}>);
+  } catch (error) {
+    // =============== Error Handling =================
+    res.status((error as any).statusCode || 500).json({
+      success: false,
+      message: (error as any).message || "An unexpected error occurred",
+    });
+  }
+};
+
+

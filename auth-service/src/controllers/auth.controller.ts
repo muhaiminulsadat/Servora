@@ -3,6 +3,7 @@ import {AppError} from "../utils/AppError.ts";
 import {registerUser} from "../services/otp.service.ts";
 import type {ApiResponse} from "../types/apiResponse.type.ts";
 import {loginService, signUpService} from "../services/auth.service.ts";
+import {forgotPasswordService} from "../services/password.service.ts";
 
 export const sendEmailController = async (req: Request, res: Response) => {
   try {
@@ -121,6 +122,32 @@ export const loginController = async (req: Request, res: Response) => {
       message: "User logged in successfully",
       data: {user: safeUser, token},
     } as ApiResponse<{user: typeof user; token: string}>);
+  } catch (error) {
+    // =============== Error Handling =================
+    res.status((error as any).statusCode || 500).json({
+      success: false,
+      message: (error as any).message || "An unexpected error occurred",
+    });
+  }
+};
+
+export const forgotPasswordController = async (req: Request, res: Response) => {
+  try {
+    const {email} = req.body;
+
+    if (!email) {
+      throw new AppError("Email is required", 400);
+    }
+
+    // ============== Service Call =================
+    const otpDoc = await forgotPasswordService(email);
+
+    res.status(201).json({
+      success: true,
+      message: "OTP sent to email for password reset",
+      data: otpDoc,
+    } as ApiResponse<typeof otpDoc>);
+    
   } catch (error) {
     // =============== Error Handling =================
     res.status((error as any).statusCode || 500).json({

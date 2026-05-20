@@ -30,10 +30,11 @@ export const registerUser = async (userData: IUserData): Promise<IOtp> => {
 
   //   ------- Save OTP to DB for later verification -------
 
-  const otpDoc = await Otp.create({
-    email,
-    otp: newOtp,
-  });
+  const otpDoc = await Otp.findOneAndUpdate(
+    {email},
+    {otp: newOtp, createdAt: new Date()},
+    {upsert: true, new: true, setDefaultsOnInsert: true},
+  );
 
   //   ------- Send OTP via email -------
 

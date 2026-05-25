@@ -7,6 +7,7 @@ import {
   forgotPasswordService,
   forgotPasswordVerifyOtpService,
   resetPasswordService,
+  updatePasswordService,
 } from "../services/password.service.ts";
 import Otp from "../models/otp.model.ts";
 
@@ -216,4 +217,40 @@ export const passwordResetController = async (req: Request, res: Response) => {
     message: "Password reset successfully",
     data: updatedUser,
   } as ApiResponse<typeof updatedUser>);
+};
+
+export const updatePasswordController = async (req: Request, res: Response) => {
+  try {
+    const {currentPassword, newPassword, userId} = req.body;
+
+    // Validations
+
+    if (!currentPassword || !newPassword) {
+      throw new AppError("Current password and new password are required", 400);
+    }
+    if (newPassword.length < 6) {
+      throw new AppError(
+        "New password must be at least 6 characters long",
+        400,
+      );
+    }
+    // ============= Service Call =================
+
+    const updatedUser = await updatePasswordService(
+      userId,
+      currentPassword,
+      newPassword,
+    );
+
+    res.status(200).json({
+      success: true,
+      message: "Password updated successfully",
+      data: updatedUser,
+    } as ApiResponse<typeof updatedUser>);
+  } catch (error) {
+    res.status((error as any).statusCode || 500).json({
+      success: false,
+      message: (error as any).message || "An unexpected error occurred",
+    });
+  }
 };

@@ -97,3 +97,39 @@ export const resetPasswordService = async (password: string, token: string) => {
 
   return user;
 };
+
+export const updatePasswordService = async (
+  userId: string,
+  currentPassword: string,
+  newPassword: string,
+) => {
+  const user = await User.findById(userId).select("+password");
+
+  if (!user) {
+    throw new AppError("User not found", 404);
+  }
+
+  if (currentPassword === newPassword) {
+    throw new AppError(
+      "New password must be different from current password",
+      400,
+    );
+  }
+
+  const isMatch = await bcrypt.compare(currentPassword, user.password);
+
+  if (!isMatch) {
+    throw new AppError("Current password is incorrect", 401);
+  }
+
+  const salt = await bcrypt.genSalt(10);
+  const hashedNewPassword = await bcrypt.hash(newPassword, salt);
+
+  user.password = hashedNewPassword;
+
+  await user.save();
+
+  const {password, ...updatedUser} = user.toObject();
+
+  return updatedUser;
+};

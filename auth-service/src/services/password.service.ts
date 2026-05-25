@@ -4,6 +4,8 @@ import {AppError} from "../utils/AppError.ts";
 import Otp from "../models/otp.model.ts";
 import {mailTemplate} from "../templates/mail.template.ts";
 import axios from "axios";
+import crypto from "crypto";
+import bcrypt from "bcrypt";
 
 export const forgotPasswordService = async (email: string) => {
   const user = await User.findOne({email});
@@ -36,4 +38,62 @@ export const forgotPasswordService = async (email: string) => {
   await axios.post("http://localhost:5000/api/v1/send-mail", mailData);
 
   return newOtp;
+};
+
+export const forgotPasswordVerifyOtpService = async (
+  email: string,
+  otp: string,
+) => {
+  const latestOtp = await Otp.findOne({email}).sort({createdAt: -1});
+
+  if (!latestOtp) {
+    throw new AppError(
+      "No OTP found for this email. Please request a new one.",
+      404,
+    );
+  }
+
+  if (latestOtp.otp !== otp) {
+    throw new AppError("Invalid OTP. OTP not matched", 422);
+  }
+
+  const token = crypto.randomBytes(32).toString("hex");
+
+  const updatedUser = await User.findOneAndUpdate(
+    {email},
+    {
+      resetPasswordToken: token,
+      resetPasswordExpires: Date.now() + 10 * 60 * 1000,
+    },
+    {returnDocument: "after"},
+  );
+
+  return updatedUser;
+};
+
+export const resetPasswordService = async (password: string, token: string) => {
+  const user = await User.findOne({
+    resetPasswordToken: token,
+    resetPasswordExpires: {$gt: Date.now()},
+  });
+
+  if (!user) {
+    throw new AppError("Session expired or invalid token", 400);
+  }
+
+  if (user.resetPasswordToken !== token) {
+    throw new AppError("Invalid token", 400);
+  }
+
+  // Hash the new password with bcrypt
+  const salt = await bcrypt.genSalt(10);
+  const hashedPassword = await bcrypt.hash(password, salt);
+
+  user.password = hashedPassword;
+  user.resetPasswordToken = "";
+  user.resetPasswordExpires = new Date(0);
+
+  await user.save();
+
+  return user;
 };

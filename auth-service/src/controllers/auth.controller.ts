@@ -221,7 +221,9 @@ export const passwordResetController = async (req: Request, res: Response) => {
 
 export const updatePasswordController = async (req: Request, res: Response) => {
   try {
-    const {currentPassword, newPassword, userId} = req.body;
+    const {currentPassword, newPassword} = req.body;
+
+    const userId = req.headers["user_id"] as string;
 
     // Validations
 

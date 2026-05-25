@@ -43,7 +43,7 @@ export const signUpService = async (signUpData: ISignUpData) => {
       role,
     });
 
-    const payload = {
+    const jwtPayload = {
       userId: newUser._id,
       email: newUser.email,
       role: newUser.role,
@@ -58,7 +58,7 @@ export const signUpService = async (signUpData: ISignUpData) => {
       );
     }
 
-    const token = jwt.sign(payload, JWT_SECRET, {
+    const token = jwt.sign(jwtPayload, JWT_SECRET, {
       expiresIn: "1y",
     });
 
@@ -115,6 +115,3 @@ export const loginService = async (email: string, password: string) => {
     throw new AppError(error.message || "An unexpected error occurred", 500);
   }
 };
-
-
-

@@ -105,6 +105,8 @@ export const updatePasswordService = async (
 ) => {
   const user = await User.findById(userId).select("+password");
 
+
+
   if (!user) {
     throw new AppError("User not found", 404);
   }

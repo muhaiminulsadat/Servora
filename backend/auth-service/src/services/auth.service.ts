@@ -1,3 +1,4 @@
+import {getRedisClient} from "../config/redis.config.ts";
 import Otp from "../models/otp.model.ts";
 import User from "../models/user.model.ts";
 import {AppError} from "../utils/AppError.ts";
@@ -16,7 +17,9 @@ export const signUpService = async (signUpData: ISignUpData) => {
   try {
     const {fullName, email, password, role, otp} = signUpData;
 
-    const latestOtp = await Otp.findOne({email}).sort({createdAt: -1});
+    // const latestOtp = await Otp.findOne({email}).sort({createdAt: -1});
+
+    const latestOtp = await getRedisClient().get(`signup_otp:${email}`);
 
     if (!latestOtp) {
       throw new AppError(
@@ -25,7 +28,7 @@ export const signUpService = async (signUpData: ISignUpData) => {
       );
     }
 
-    if (latestOtp.otp !== otp) {
+    if (latestOtp !== otp) {
       throw new AppError(
         "Invalid OTP. Please check the code and try again.",
         400,

@@ -4,6 +4,7 @@ import {AppError} from "../utils/AppError.ts";
 import otp from "otp-generator";
 import axios from "axios";
 import {mailTemplate} from "../templates/mail.template.ts";
+import {getRedisClient} from "../config/redis.config.ts";
 
 interface IUserData {
   fullName: string;
@@ -12,7 +13,7 @@ interface IUserData {
   role: "user" | "admin" | "worker";
 }
 
-export const registerUser = async (userData: IUserData): Promise<IOtp> => {
+export const registerUser = async (userData: IUserData) => {
   const {email, password, fullName, role} = userData;
 
   const isUserExists = await User.findOne({email});
@@ -30,11 +31,18 @@ export const registerUser = async (userData: IUserData): Promise<IOtp> => {
 
   //   ------- Save OTP to DB for later verification -------
 
-  const otpDoc = await Otp.findOneAndUpdate(
-    {email},
-    {otp: newOtp, createdAt: new Date()},
-    {upsert: true, new: true, setDefaultsOnInsert: true},
-  );
+  // const otpDoc = await Otp.findOneAndUpdate(
+  //   {email},
+  //   {otp: newOtp, createdAt: new Date()},
+  //   {upsert: true, new: true, setDefaultsOnInsert: true},
+  // );
+
+  //   ------- Save OTP to redis for later verification -------
+  const client = getRedisClient();
+
+  const otpDoc = await client.set(`signup_otp:${email}`, newOtp, {
+    EX: 5 * 60,
+  });
 
   //   ------- Send OTP via email -------
 
@@ -51,6 +59,4 @@ export const registerUser = async (userData: IUserData): Promise<IOtp> => {
   );
 
   console.log(response.data);
-
-  return otpDoc;
 };

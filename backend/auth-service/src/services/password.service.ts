@@ -6,6 +6,7 @@ import {mailTemplate} from "../templates/mail.template.ts";
 import axios from "axios";
 import crypto from "crypto";
 import bcrypt from "bcrypt";
+import {getRedisClient} from "../config/redis.config.ts";
 
 export const forgotPasswordService = async (email: string) => {
   const user = await User.findOne({email});
@@ -22,11 +23,19 @@ export const forgotPasswordService = async (email: string) => {
     specialChars: false,
   });
 
-  const newOtp = await Otp.findOneAndUpdate(
-    {email},
-    {otp, createdAt: new Date()},
-    {upsert: true, new: true, setDefaultsOnInsert: true},
-  );
+  // const newOtp = await Otp.findOneAndUpdate(
+  //   {email},
+  //   {otp, createdAt: new Date()},
+  //   {upsert: true, new: true, setDefaultsOnInsert: true},
+  // );
+
+  // save otp in redis
+
+  const client = getRedisClient();
+
+  await client.set(`forgot_password_otp:${email}`, otp, {
+    EX: 5 * 60,
+  });
 
   const mailData = {
     to: email,
@@ -37,14 +46,15 @@ export const forgotPasswordService = async (email: string) => {
 
   await axios.post("http://localhost:5000/api/v1/send-mail", mailData);
 
-  return newOtp;
+  return null;
 };
 
 export const forgotPasswordVerifyOtpService = async (
   email: string,
   otp: string,
 ) => {
-  const latestOtp = await Otp.findOne({email}).sort({createdAt: -1});
+  // const latestOtp = await Otp.findOne({email}).sort({createdAt: -1});
+  const latestOtp = await getRedisClient().get(`forgot_password_otp:${email}`);
 
   if (!latestOtp) {
     throw new AppError(
@@ -53,7 +63,7 @@ export const forgotPasswordVerifyOtpService = async (
     );
   }
 
-  if (latestOtp.otp !== otp) {
+  if (latestOtp !== otp) {
     throw new AppError("Invalid OTP. OTP not matched", 422);
   }
 
@@ -104,8 +114,6 @@ export const updatePasswordService = async (
   newPassword: string,
 ) => {
   const user = await User.findById(userId).select("+password");
-
-
 
   if (!user) {
     throw new AppError("User not found", 404);

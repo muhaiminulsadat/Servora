@@ -151,8 +151,8 @@ export const forgotPasswordController = async (req: Request, res: Response) => {
     res.status(201).json({
       success: true,
       message: "OTP sent to email for password reset",
-      data: otpDoc,
-    } as ApiResponse<typeof otpDoc>);
+      
+    } as ApiResponse<null>);
   } catch (error) {
     // =============== Error Handling =================
     res.status((error as any).statusCode || 500).json({

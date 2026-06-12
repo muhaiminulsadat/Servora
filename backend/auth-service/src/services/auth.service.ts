@@ -52,20 +52,35 @@ export const signUpService = async (signUpData: ISignUpData) => {
       role: newUser.role,
     };
 
-    const JWT_SECRET = process.env.JWT_SECRET;
+    // ----------- Access and Refresh Token Generation -----------
 
-    if (!JWT_SECRET) {
+    const ACCESS_TOKEN_JWT_SECRET = process.env.ACCESS_TOKEN_JWT_SECRET;
+
+    if (!ACCESS_TOKEN_JWT_SECRET) {
       throw new AppError(
-        "JWT secret is not defined in environment variables",
+        "Access token JWT secret is not defined in environment variables",
         500,
       );
     }
 
-    const token = jwt.sign(jwtPayload, JWT_SECRET, {
-      expiresIn: "1y",
+    const REFRESH_TOKEN_JWT_SECRET = process.env.REFRESH_TOKEN_JWT_SECRET;
+
+    if (!REFRESH_TOKEN_JWT_SECRET) {
+      throw new AppError(
+        "Refresh token JWT secret is not defined in environment variables",
+        500,
+      );
+    }
+
+    const accessToken = jwt.sign(jwtPayload, ACCESS_TOKEN_JWT_SECRET, {
+      expiresIn: "15min",
     });
 
-    return {user: newUser.toObject(), token};
+    const refreshToken = jwt.sign(jwtPayload, REFRESH_TOKEN_JWT_SECRET, {
+      expiresIn: "7d",
+    });
+
+    return {user: newUser.toObject(), accessToken, refreshToken};
   } catch (error: any) {
     if (error instanceof AppError) {
       throw error;

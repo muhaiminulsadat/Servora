@@ -67,7 +67,7 @@ export const signUpController = async (req: Request, res: Response) => {
 
     // ============== Service Call =================
 
-    const {user, token} = await signUpService({
+    const {user, refreshToken, accessToken} = await signUpService({
       fullName,
       email,
       password,
@@ -84,13 +84,13 @@ export const signUpController = async (req: Request, res: Response) => {
       sameSite: "strict" as const,
     };
 
-    res.cookie("token", token, options);
+    res.cookie("refreshToken", refreshToken, options);
 
     res.status(201).json({
       success: true,
       message: "User registered successfully",
-      data: {user: safeUser, token},
-    } as ApiResponse<{user: typeof user; token: string}>);
+      data: {user: safeUser, accessToken},
+    } as ApiResponse<{user: typeof user; accessToken: string}>);
   } catch (error) {
     // =============== Error Handling =================
     res.status((error as any).statusCode || 500).json({
@@ -151,7 +151,6 @@ export const forgotPasswordController = async (req: Request, res: Response) => {
     res.status(201).json({
       success: true,
       message: "OTP sent to email for password reset",
-      
     } as ApiResponse<null>);
   } catch (error) {
     // =============== Error Handling =================

@@ -48,4 +48,3 @@ app.listen(PORT, () => {
   console.log(`Gateway server is running on port ${PORT}`);
 });
 
-//TIMESTAMP: 1:12:00 -> Lecture 11.

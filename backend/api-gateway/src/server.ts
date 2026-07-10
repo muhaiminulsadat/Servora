@@ -1,15 +1,22 @@
-import express from "express";
+import express, {type NextFunction, type Request, type Response} from "express";
 import dotenv from "dotenv";
 import proxy from "express-http-proxy";
 import {authMiddleware} from "./middlewares/auth.middleware.ts";
+import cookieParser from "cookie-parser";
 
 dotenv.config();
 
 const app = express();
+const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
+app.use(cookieParser());
 
-const PORT = process.env.PORT || 3000;
+// Logger
+app.use((req: Request, res: Response, next: NextFunction) => {
+  console.log(`[Gateway]: ${req.method} ${req.url}`);
+  next();
+});
 
 const authProxy = proxy("http://localhost:3001", {
   proxyReqPathResolver: (req) => {
@@ -23,6 +30,14 @@ const authProxy = proxy("http://localhost:3001", {
 
     return proxyReqOpts;
   },
+
+  proxyErrorHandler: (err: any, res: Response, next: NextFunction) => {
+    console.error("Error from the auth service: ", err);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error from auth service",
+    });
+  },
 });
 
 const publicAuthRoutes = [
@@ -32,6 +47,8 @@ const publicAuthRoutes = [
   "/forgot-password",
   "/forgot-password-verify-otp",
   "/reset-password",
+  "/refresh-token",
+  "/logout",
 ];
 
 const privateAuthRoutes = ["/update-password"];
@@ -47,4 +64,3 @@ privateAuthRoutes.forEach((route) => {
 app.listen(PORT, () => {
   console.log(`Gateway server is running on port ${PORT}`);
 });
-

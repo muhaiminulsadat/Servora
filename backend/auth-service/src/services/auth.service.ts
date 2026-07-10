@@ -13,13 +13,22 @@ interface ISignUpData {
   otp: string;
 }
 
+interface IRefreshToken {
+  refreshToken: string;
+}
+
+interface ILogout {
+  refreshToken: string;
+}
+
 export const signUpService = async (signUpData: ISignUpData) => {
+  const client = getRedisClient();
   try {
     const {fullName, email, password, role, otp} = signUpData;
 
     // const latestOtp = await Otp.findOne({email}).sort({createdAt: -1});
 
-    const latestOtp = await getRedisClient().get(`signup_otp:${email}`);
+    const latestOtp = await client.get(`signup_otp:${email}`);
 
     if (!latestOtp) {
       throw new AppError(
@@ -80,6 +89,11 @@ export const signUpService = async (signUpData: ISignUpData) => {
       expiresIn: "7d",
     });
 
+    // save refresh token in redis
+    await client.set(`session:${newUser._id}`, refreshToken, {
+      EX: 7 * 24 * 60 * 60,
+    });
+
     return {user: newUser.toObject(), accessToken, refreshToken};
   } catch (error: any) {
     if (error instanceof AppError) {
@@ -91,6 +105,7 @@ export const signUpService = async (signUpData: ISignUpData) => {
 };
 
 export const loginService = async (email: string, password: string) => {
+  const client = getRedisClient();
   try {
     const user = await User.findOne({email}).select("+password");
 
@@ -104,27 +119,141 @@ export const loginService = async (email: string, password: string) => {
       throw new AppError("Invalid email or password", 401);
     }
 
-    const payload = {
+    const jwtPayload = {
       userId: user._id,
       email: user.email,
-      fullName: user.fullName,
       role: user.role,
     };
 
-    const JWT_SECRET = process.env.JWT_SECRET;
+    // ----------- Access and Refresh Token Generation -----------
 
-    if (!JWT_SECRET) {
+    const ACCESS_TOKEN_JWT_SECRET = process.env.ACCESS_TOKEN_JWT_SECRET;
+
+    if (!ACCESS_TOKEN_JWT_SECRET) {
       throw new AppError(
-        "JWT secret is not defined in environment variables",
+        "Access token JWT secret is not defined in environment variables",
         500,
       );
     }
 
-    const token = jwt.sign(payload, JWT_SECRET, {
-      expiresIn: "1y",
+    const REFRESH_TOKEN_JWT_SECRET = process.env.REFRESH_TOKEN_JWT_SECRET;
+
+    if (!REFRESH_TOKEN_JWT_SECRET) {
+      throw new AppError(
+        "Refresh token JWT secret is not defined in environment variables",
+        500,
+      );
+    }
+
+    const accessToken = jwt.sign(jwtPayload, ACCESS_TOKEN_JWT_SECRET, {
+      expiresIn: "15min",
     });
 
-    return {user: user.toObject(), token};
+    const refreshToken = jwt.sign(
+      {userId: user._id},
+      REFRESH_TOKEN_JWT_SECRET,
+      {
+        expiresIn: "7d",
+      },
+    );
+
+    // save refresh token in redis
+    await client.set(`session:${user._id}`, refreshToken, {
+      EX: 7 * 24 * 60 * 60,
+    });
+
+    return {user: user.toObject(), accessToken, refreshToken};
+  } catch (error: any) {
+    if (error instanceof AppError) {
+      throw error;
+    }
+
+    throw new AppError(error.message || "An unexpected error occurred", 500);
+  }
+};
+
+export const refreshTokenService = async (data: IRefreshToken) => {
+  const refreshToken = data.refreshToken;
+
+  const decoded: any = jwt.verify(
+    refreshToken,
+    process.env.REFRESH_TOKEN_JWT_SECRET as string,
+  );
+
+  const userId = decoded.userId;
+
+  const client = getRedisClient();
+
+  // Check Redis session
+  const storedToken = await client.get(`session:${userId}`);
+
+  if (storedToken !== refreshToken) {
+    throw new AppError("Invalid refresh token", 401);
+  }
+
+  const user = await User.findById(userId);
+
+  if (!user) {
+    throw new AppError("User not found", 404);
+  }
+
+  const jwtPayload = {
+    userId: user._id,
+    email: user.email,
+    role: user.role,
+  };
+
+  const accessToken = jwt.sign(
+    jwtPayload,
+    process.env.ACCESS_TOKEN_JWT_SECRET as string,
+    {
+      expiresIn: "15min",
+    },
+  );
+
+  const newRefreshToken = jwt.sign(
+    {userId: user._id},
+    process.env.REFRESH_TOKEN_JWT_SECRET as string,
+    {
+      expiresIn: "7d",
+    },
+  );
+
+  await client.set(`session:${user._id}`, newRefreshToken, {
+    EX: 7 * 24 * 60 * 60,
+  });
+
+  return {user: user.toObject(), accessToken, refreshToken: newRefreshToken};
+};
+
+export const logoutServiceCall = async (data: ILogout) => {
+  const client = getRedisClient();
+
+  try {
+      const refreshToken = data.refreshToken;
+
+    const decoded: any = jwt.verify(
+      refreshToken,
+      process.env.REFRESH_TOKEN_JWT_SECRET as string,
+    );
+
+    const userId = decoded.userId;
+
+    // Check Redis session
+    const storedToken = await client.get(`session:${userId}`);
+
+    if (storedToken !== refreshToken) {
+      throw new AppError("Invalid refresh token", 401);
+    }
+
+    // Delete from Redis
+    await client.del(`session:${userId}`);
+
+    await client.set(`blacklist:${userId}`, "true", {
+      EX: 15 * 60,
+    });
+
+    return {message: "User logged out successfully"};
   } catch (error: any) {
     if (error instanceof AppError) {
       throw error;

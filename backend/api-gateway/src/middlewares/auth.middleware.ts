@@ -1,6 +1,7 @@
 import type {NextFunction, Request, Response} from "express";
 import {AppError} from "../utils/AppError.ts";
 import jwt from "jsonwebtoken";
+import {timeStamp} from "node:console";
 
 export const authMiddleware = (
   req: Request,
@@ -10,11 +11,9 @@ export const authMiddleware = (
   try {
     const authHeader = req.headers.authorization;
 
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      throw new AppError("Invalid token", 401);
-    }
-
-    const token = authHeader.split(" ")[1];
+    const token = authHeader?.startsWith("Bearer ")
+      ? authHeader.split(" ")[1]
+      : req.cookies.accessToken || req?.body?.token;
 
     if (!token) {
       throw new AppError("Token not provided", 401);
@@ -37,3 +36,5 @@ export const authMiddleware = (
     });
   }
 };
+
+

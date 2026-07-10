@@ -3,7 +3,9 @@ import {
   forgotPasswordController,
   forgotPasswordVerifyOtpController,
   loginController,
+  logoutController,
   passwordResetController,
+  refreshTokenController,
   sendEmailController,
   signUpController,
   updatePasswordController,
@@ -18,5 +20,7 @@ router.post("/forgot-password", forgotPasswordController);
 router.put("/forgot-password-verify-otp", forgotPasswordVerifyOtpController);
 router.put("/reset-password", passwordResetController);
 router.put("/update-password", updatePasswordController);
+router.post("/refresh-token", refreshTokenController);
+router.post("/logout", logoutController);
 
 export default router;

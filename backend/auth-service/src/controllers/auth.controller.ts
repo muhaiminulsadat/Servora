@@ -2,7 +2,12 @@ import type {Request, Response} from "express";
 import {AppError} from "../utils/AppError.ts";
 import {registerUser} from "../services/otp.service.ts";
 import type {ApiResponse} from "../types/apiResponse.type.ts";
-import {loginService, signUpService} from "../services/auth.service.ts";
+import {
+  loginService,
+  logoutServiceCall,
+  refreshTokenService,
+  signUpService,
+} from "../services/auth.service.ts";
 import {
   forgotPasswordService,
   forgotPasswordVerifyOtpService,
@@ -10,6 +15,7 @@ import {
   updatePasswordService,
 } from "../services/password.service.ts";
 import Otp from "../models/otp.model.ts";
+import {getRedisClient} from "../config/redis.config.ts";
 
 export const sendEmailController = async (req: Request, res: Response) => {
   try {
@@ -109,8 +115,31 @@ export const loginController = async (req: Request, res: Response) => {
       throw new AppError("Email and password are required", 400);
     }
 
+    // ============== Rate Limiting with Redis =================
+
+    const client = getRedisClient();
+    const clientIp = req.ip;
+
+    const redisKey = `login_attempts:${clientIp}`;
+
+    const attempts = await client.incr(redisKey);
+
+    if (attempts === 1) {
+      await client.expire(redisKey, 60);
+    }
+
+    if (attempts > 5) {
+      throw new AppError(
+        "Too many login attempts. Please try again after a minute.",
+        429,
+      );
+    }
+
     // ============== Service Call =================
-    const {user, token} = await loginService(email, password);
+    const {user, refreshToken, accessToken} = await loginService(
+      email,
+      password,
+    );
 
     const {password: _password, ...safeUser} = user;
 
@@ -121,13 +150,13 @@ export const loginController = async (req: Request, res: Response) => {
       sameSite: "strict" as const,
     };
 
-    res.cookie("token", token, options);
+    res.cookie("refreshToken", refreshToken, options);
 
     res.status(200).json({
       success: true,
       message: "User logged in successfully",
-      data: {user: safeUser, token},
-    } as ApiResponse<{user: typeof user; token: string}>);
+      data: {user: safeUser, accessToken},
+    } as ApiResponse<{user: typeof user; accessToken: string}>);
   } catch (error) {
     // =============== Error Handling =================
     res.status((error as any).statusCode || 500).json({
@@ -248,6 +277,66 @@ export const updatePasswordController = async (req: Request, res: Response) => {
       message: "Password updated successfully",
       data: updatedUser,
     } as ApiResponse<typeof updatedUser>);
+  } catch (error) {
+    res.status((error as any).statusCode || 500).json({
+      success: false,
+      message: (error as any).message || "An unexpected error occurred",
+    });
+  }
+};
+
+export const refreshTokenController = async (req: Request, res: Response) => {
+  try {
+    const refreshToken = req.cookies.refreshToken;
+
+    if (!refreshToken) {
+      throw new AppError("Refresh token not found", 401);
+    }
+
+    const {
+      user,
+      accessToken,
+      refreshToken: newRefreshToken,
+    } = await refreshTokenService({refreshToken});
+
+    res.cookie("refreshToken", newRefreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict" as const,
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+
+    res.status(200).json({
+      success: true,
+      message: "Refresh token generated successfully",
+      data: {user: user, accessToken: accessToken},
+    } as ApiResponse<{user: typeof user; accessToken: string}>);
+
+    console.log("Refresh token:", refreshToken);
+  } catch (error) {
+    res.status((error as any).statusCode || 500).json({
+      success: false,
+      message: (error as any).message || "An unexpected error occurred",
+    });
+  }
+};
+
+export const logoutController = async (req: Request, res: Response) => {
+  try {
+    const refreshToken = req.cookies.refreshToken;
+
+    if (!refreshToken) {
+      throw new AppError("Refresh token not found", 401);
+    }
+
+    const {message} = await logoutServiceCall({refreshToken});
+
+    res.clearCookie("refreshToken");
+
+    res.status(200).json({
+      success: true,
+      message,
+    });
   } catch (error) {
     res.status((error as any).statusCode || 500).json({
       success: false,

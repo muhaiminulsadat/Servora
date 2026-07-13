@@ -13,7 +13,7 @@ import {
 
 const router = express.Router();
 
-router.post("/sendMail", sendEmailController);
+router.post("/send-auth-mail", sendEmailController);
 router.post("/signUp", signUpController);
 router.post("/login", loginController);
 router.post("/forgot-password", forgotPasswordController);

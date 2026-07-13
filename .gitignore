@@ -1,3 +1,5 @@
 graphify-out
 AGENTS.md
 .agents
+node_modules/
+dist/

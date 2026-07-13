@@ -1,9 +1,11 @@
-import {Button} from "./components/ui/button";
+import {RouterProvider} from "react-router-dom";
+
+import {routes} from "./app/routes";
 
 const App = () => {
   return (
     <div className="">
-      <Button>Click Me</Button>
+      <RouterProvider router={routes} />
     </div>
   );
 };

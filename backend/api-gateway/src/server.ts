@@ -3,6 +3,7 @@ import dotenv from "dotenv";
 import proxy from "express-http-proxy";
 import {authMiddleware} from "./middlewares/auth.middleware.ts";
 import cookieParser from "cookie-parser";
+import cors from "cors";
 
 dotenv.config();
 
@@ -11,6 +12,7 @@ const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 app.use(cookieParser());
+app.use(cors());
 
 // Logger
 app.use((req: Request, res: Response, next: NextFunction) => {
@@ -40,8 +42,21 @@ const authProxy = proxy("http://localhost:3001", {
   },
 });
 
+const mailProxy = proxy("http://localhost:3002", {
+  proxyReqPathResolver: (req) => {
+    return req.originalUrl.replace("/api/v1", "");
+  },
+  proxyErrorHandler: (err: any, res: Response, next: NextFunction) => {
+    console.error("Error from the mail service: ", err);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error from mail service",
+    });
+  },
+});
+
 const publicAuthRoutes = [
-  "/sendMail",
+  "/send-auth-mail",
   "/signUp",
   "/login",
   "/forgot-password",
@@ -60,6 +75,8 @@ publicAuthRoutes.forEach((route) => {
 privateAuthRoutes.forEach((route) => {
   app.use(`/api/v1/auth${route}`, authMiddleware, authProxy);
 });
+
+app.use("/api/v1/send-mail", mailProxy);
 
 app.listen(PORT, () => {
   console.log(`Gateway server is running on port ${PORT}`);

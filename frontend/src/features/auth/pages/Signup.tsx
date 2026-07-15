@@ -1,6 +1,6 @@
 import * as React from "react";
 import {useState} from "react";
-import {Link} from "react-router-dom";
+import {Link, useNavigate} from "react-router-dom";
 import {
   Card,
   CardHeader,
@@ -36,6 +36,8 @@ export default function Signup() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
+  const navigate = useNavigate();
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name || !email || !password || !confirmPassword) {
@@ -67,6 +69,14 @@ export default function Signup() {
       console.log(res);
 
       toast.success(res.message);
+      navigate("/verify-otp", {
+        state: {
+          email,
+          name,
+          role,
+          password,
+        },
+      });
     } catch (error: any) {
       toast.error(error.message || "Failed to register. Please try again.");
     } finally {

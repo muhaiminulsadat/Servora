@@ -5,3 +5,5 @@ export type signUpPayload = {
   password: string;
   confirmPassword: string;
 };
+
+export type loginPayload = Pick<signUpPayload, "email" | "password">;

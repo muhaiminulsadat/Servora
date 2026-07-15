@@ -10,19 +10,19 @@ import {
   CardFooter,
 } from "@/components/ui/card";
 import {Button} from "@/components/ui/button";
-import {
-  InputOTP,
-  InputOTPGroup,
-  InputOTPSlot,
-} from "@/components/ui/input-otp";
+import {InputOTP, InputOTPGroup, InputOTPSlot} from "@/components/ui/input-otp";
 import {ShieldCheck, ArrowLeft, RefreshCw} from "lucide-react";
 import toast from "react-hot-toast";
 import {signUpVerifyApiCall} from "../services/verify";
 import {signUpMailSendApiCall} from "../services/signup";
+import {useDispatch} from "react-redux";
+import {setToken} from "../authSlice";
 
 export default function VerifyOtp() {
   const location = useLocation();
   const navigate = useNavigate();
+  const dispatch = useDispatch();
+
   const [otp, setOtp] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(60);
@@ -68,9 +68,13 @@ export default function VerifyOtp() {
         otp,
       });
 
+      console.log(res);
+
+      dispatch(setToken(res.data.accessToken));
+
       toast.success(res.message || "Email verified successfully!");
       // Navigate to login or dashboard
-      navigate("/login", {replace: true});
+      navigate("/", {replace: true});
     } catch (error: any) {
       toast.error(error.message || "Invalid OTP code.");
     } finally {
@@ -123,12 +127,16 @@ export default function VerifyOtp() {
             Verify Email
           </CardTitle>
           <CardDescription className="text-muted-foreground/90 max-w-xs mx-auto">
-            We sent a 4-digit code to <span className="font-semibold text-foreground">{email}</span>
+            We sent a 4-digit code to{" "}
+            <span className="font-semibold text-foreground">{email}</span>
           </CardDescription>
         </CardHeader>
 
         <CardContent className="flex flex-col items-center justify-center pb-6">
-          <form onSubmit={handleVerify} className="w-full flex flex-col items-center space-y-6">
+          <form
+            onSubmit={handleVerify}
+            className="w-full flex flex-col items-center space-y-6"
+          >
             <div className="flex justify-center py-2">
               <InputOTP
                 maxLength={4}
